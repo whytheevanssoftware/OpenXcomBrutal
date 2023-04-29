@@ -369,7 +369,7 @@ void BattlescapeGame::handleAI(BattleUnit *unit)
 			else
 				Log(LOG_INFO) << "#" << action.actor->getId() << "--" << action.actor->getType() << " I am out of ammo or have no weapon and should now try to find a new weapon or ammunition.";
 		}
-		if (unit->getOriginalFaction() != FACTION_PLAYER || Options::autoCombat)
+		if (unit->getOriginalFaction() != FACTION_PLAYER || (Options::autoCombat && !Options::xcommandAI))
 		{
 			if ((unit->getOriginalFaction() == FACTION_HOSTILE && unit->getVisibleUnits()->empty()) || pickUpWeaponsMoreActively)
 			{

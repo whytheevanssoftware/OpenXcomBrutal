@@ -81,3 +81,5 @@ bin/user
 /.kdev4/
 /*.kdev4
 bin/Win32/stderr.txt
+.vscode/c_cpp_properties.json
+src/OpenXcom.2010.vcxproj

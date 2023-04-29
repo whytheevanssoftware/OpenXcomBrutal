@@ -5590,10 +5590,20 @@ bool BattleUnit::isBrutal() const
 	else if (getFaction() == FACTION_NEUTRAL)
 		brutal = Options::brutalCivilians;
 	else if (getFaction() == FACTION_PLAYER)
-		brutal = Options::autoCombat;
+		brutal = Options::autoCombat && !Options::xcommandAI;
 	if (_unitRules && _unitRules->isBrutal())
 		brutal = true;
 	return brutal;
+}
+
+/**
+ * Returns whether the unit should be controlled by XCOMmandAI
+ */
+bool BattleUnit::isXCOMmandAI() const
+{
+	if (getFaction() == FACTION_PLAYER)
+		return Options::autoCombat && Options::xcommandAI;
+	return false;
 }
 
 /**

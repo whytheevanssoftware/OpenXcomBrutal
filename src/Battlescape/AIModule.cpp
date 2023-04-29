@@ -306,6 +306,12 @@ void AIModule::think(BattleAction *action)
 		brutalThink(action);
 		return;
 	}
+	
+	if (_unit->isXCOMmandAI())
+	{
+		xcommandAIthink(action);
+		return;
+	}
 
 	if (_spottingEnemies && !_escapeTUs)
 	{
@@ -3796,6 +3802,10 @@ void AIModule::brutalThink(BattleAction* action)
 	{
 		action->number -= 1;
 	}
+}
+
+void AIModule::xcommandAIthink(BattleAction* action){
+	return;
 }
 
 /**

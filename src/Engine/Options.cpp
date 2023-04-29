@@ -225,6 +225,7 @@ void create()
 	_info.push_back(OptionInfo("aiAggression", &aiAggression, false, "STR_AIAGGRESSION", "STR_AI"));
 	_info.push_back(OptionInfo("brutalCivilians", &brutalCivilians, false, "STR_BRUTALCIVILIANS", "STR_AI"));
 	_info.push_back(OptionInfo("autoCombat", &autoCombat, false, "STR_AUTOCOMBAT", "STR_AI"));
+	_info.push_back(OptionInfo("xcommandAI", &xcommandAI, false, "STR_XCOMMANDAI", "STR_AI"));
 	_info.push_back(OptionInfo("autoAggression", &autoAggression, true, "STR_AUTOAGGRESSION", "STR_AI"));
 
 	// OXCE GUI

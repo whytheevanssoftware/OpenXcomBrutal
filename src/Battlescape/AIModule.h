@@ -150,6 +150,8 @@ public:
 	bool visibleToAnyFriend(BattleUnit *target) const;
 	/// Handles behavior of brutalAI
 	void brutalThink(BattleAction *action);
+	/// Handles behavior of XCOMmandAI
+	void xcommandAIthink(BattleAction *action);
 	/// Like selectSpottedUnitForSniper but works for everyone
 	bool brutalSelectSpottedUnitForSniper();
 	/// look up in _allPathFindingNodes how many time-units we need to get to a specific position

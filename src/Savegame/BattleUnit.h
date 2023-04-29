@@ -835,6 +835,8 @@ public:
 	void disableIndicators();
 	/// Returns whether this unit uses brutal-AI
 	bool isBrutal() const;
+	/// Returns whether this unit uses XCOMmandAI
+	bool isXCOMmandAI() const;
 	/// Returns whether this unit is allowed to cheat with knowledge it cannot have
 	bool isCheatOnMovement();
 	/// Returns the targetting mode the unit is allowed to use
