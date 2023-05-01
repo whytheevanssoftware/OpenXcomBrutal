@@ -3804,7 +3804,128 @@ void AIModule::brutalThink(BattleAction* action)
 	}
 }
 
-void AIModule::xcommandAIthink(BattleAction* action){
+void AIModule::xcommandAIthink(BattleAction* action)
+{
+	
+	struct SimpleTile
+	{
+		Position pos;
+		bool discovered, traversable = true, door = false;
+		SimpleTile(Tile* tile)
+		{
+			pos = tile->getPosition();
+			discovered = tile->isDiscovered(O_FLOOR);
+			traversable = !tile->isBigWall() && !tile->getObstacle(O_FLOOR) && !tile->getDangerous();
+			door = false;
+			for (int i = 0; i < O_MAX; i++)
+			{
+				if (tile->isDoor((TilePart)i))
+				{
+					door = true;
+					break;
+				}
+			}
+		}
+	};
+	struct SimpleAlly
+	{
+		Position pos;
+		int timeUnits;
+		struct {
+			int health, armorTotal, energy, reaction, morale, mana;
+		} stats;
+		bool isMindControlled = false, isStunned = false;
+		int mainWeapon;
+		bool needReload = false;
+		SimpleAlly(BattleUnit* ally, SavedBattleGame* save)
+		{
+			pos = ally->getPosition();
+			timeUnits = ally->getTimeUnits();
+			stats.health = ally->getHealth();
+			for (int i = 0; i < SIDE_MAX; i++)
+				stats.armorTotal += ally->getArmor()->getArmor((UnitSide)i);
+			stats.energy = ally->getEnergy();
+			stats.reaction = ally->getReactionScore();
+			stats.morale = ally->getMorale();
+			stats.mana = ally->getMana();
+			isMindControlled = ally->getFaction() != ally->getOriginalFaction();
+			isStunned = ally->getStunlevel() > 0;
+			mainWeapon = ally->getMainHandWeapon()->getId();
+			needReload = !ally->getMainHandWeapon()->haveAnyAmmo();
+		}
+	};
+	struct SimpleEnemy
+	{
+		Position pos;
+		std::string type;
+		SimpleEnemy(BattleUnit *enemy)
+		{
+			pos = enemy->getPosition();
+			type = enemy->getType();
+		}
+	};
+	struct AIinfo
+	{
+		int currentUnit;
+		int currentTurn;
+		struct
+		{
+			std::vector<SimpleTile> byTile;
+			int discovered = 0;
+		} tiles;
+		std::vector<SimpleAlly> allies;
+		std::vector<SimpleEnemy> enemies;
+		AIinfo(int id, int turn, std::vector<SimpleTile> tileInfo, std::vector<SimpleAlly> allyInfo, std::vector<SimpleEnemy> enemyInfo)
+		{
+			currentUnit = id;
+			currentTurn = turn;
+			tiles.discovered = 0;
+			for (SimpleTile &tile : tileInfo)
+			{
+				tiles.byTile.push_back(tile);
+				if (tile.discovered)
+					tiles.discovered++;
+			}
+			for (SimpleAlly &ally : allyInfo)
+				allies.push_back(ally);
+			for (SimpleEnemy &enemy : enemyInfo)
+				enemies.push_back(enemy);
+		}
+	};
+
+	int id = _unit->getId();
+	int turn = _save->getTurn();
+	Position pos = _unit->getPosition();
+	int hp = _unit->getHealth();
+	bool mindControlled = _unit->getFaction() != _unit->getOriginalFaction();
+	int t = _save->getTurn();
+	std::vector<SimpleTile> tiles;
+	for (int i = 0; i < _save->getMapSizeXYZ(); i++)
+	{
+		Tile* t = _save->getTile(i);
+		if (!t || !t->isDiscovered(O_FLOOR))
+			continue;
+		tiles.push_back(SimpleTile(t));
+	}
+	std::vector<SimpleAlly> allies;
+	std::vector<SimpleEnemy> enemies;
+	for (BattleUnit* unit : *(_save->getUnits()))
+	{
+		if (unit->getMainHandWeapon() == NULL || unit->isOut())
+			continue;
+		if (unit->getFaction() != _unit->getFaction())
+		{
+			if (visibleToAnyFriend(unit))
+				enemies.push_back(SimpleEnemy(unit));
+		}
+		else
+		{
+			auto save = _save;
+			allies.push_back(SimpleAlly(unit, save));
+		}
+	}
+
+	AIinfo* aiInfo = new AIinfo(id, turn, tiles, allies, enemies);
 	return;
 }
 
