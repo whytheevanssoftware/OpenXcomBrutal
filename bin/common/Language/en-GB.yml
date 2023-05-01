@@ -145,6 +145,8 @@ en-GB:
   STR_BRUTALCIVILIANS_DESC: "Neutral forces will be controlled by Brutal AI."
   STR_AUTOCOMBAT: "Automated combat"
   STR_AUTOCOMBAT_DESC: "Control of player-units is handed to the AI. Toggle with Ctrl+a during your units turn."
+  STR_XCOMMANDAI: "XCOMmandAI"
+  STR_XCOMMANDAI_DESC: "Automated combat is handed to the XCOMmandAI system."
   STR_AUTOAGGRESSION: "Force aggressive auto-combat-behaviour"
   STR_AUTOAGGRESSION_DESC: "Forces player-units controlled by Brutal AI to always be aggressive. For auto-combat it is recommended to force at least one side to be aggressive to avoid stalemates."
   STR_AI_PERFORMANCE: "Performance optimisation for huge maps"

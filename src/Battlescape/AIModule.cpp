@@ -3806,7 +3806,9 @@ void AIModule::brutalThink(BattleAction* action)
 
 void AIModule::xcommandAIthink(BattleAction* action)
 {
-	
+	if (_unit->getWantToEndTurn())
+		return;
+
 	struct SimpleTile
 	{
 		Position pos;
@@ -3837,7 +3839,7 @@ void AIModule::xcommandAIthink(BattleAction* action)
 		bool isMindControlled = false, isStunned = false;
 		int mainWeapon;
 		bool needReload = false;
-		SimpleAlly(BattleUnit* ally, SavedBattleGame* save)
+		SimpleAlly(BattleUnit* ally)
 		{
 			pos = ally->getPosition();
 			timeUnits = ally->getTimeUnits();
@@ -3858,16 +3860,20 @@ void AIModule::xcommandAIthink(BattleAction* action)
 	{
 		Position pos;
 		std::string type;
-		SimpleEnemy(BattleUnit *enemy)
+		bool canTarget;
+		SimpleEnemy(BattleUnit *enemy, bool targetable = false)
 		{
 			pos = enemy->getPosition();
 			type = enemy->getType();
+			canTarget = targetable;
 		}
 	};
-	struct AIinfo
+
+	// AI Observation Space
+	struct AIobservations
 	{
-		int currentUnit;
-		int currentTurn;
+		int currentUnit = 0;
+		int currentTurn = 0;
 		struct
 		{
 			std::vector<SimpleTile> byTile;
@@ -3875,24 +3881,48 @@ void AIModule::xcommandAIthink(BattleAction* action)
 		} tiles;
 		std::vector<SimpleAlly> allies;
 		std::vector<SimpleEnemy> enemies;
-		AIinfo(int id, int turn, std::vector<SimpleTile> tileInfo, std::vector<SimpleAlly> allyInfo, std::vector<SimpleEnemy> enemyInfo)
+		AIobservations(){};
+		AIobservations(int id, int turn, std::vector<SimpleTile> tileInfo, std::vector<SimpleAlly> allyInfo, std::vector<SimpleEnemy> enemyInfo)
 		{
 			currentUnit = id;
 			currentTurn = turn;
 			tiles.discovered = 0;
-			for (SimpleTile &tile : tileInfo)
+			for (SimpleTile& tile : tileInfo)
 			{
 				tiles.byTile.push_back(tile);
 				if (tile.discovered)
 					tiles.discovered++;
 			}
-			for (SimpleAlly &ally : allyInfo)
+			for (SimpleAlly& ally : allyInfo)
 				allies.push_back(ally);
-			for (SimpleEnemy &enemy : enemyInfo)
+			for (SimpleEnemy& enemy : enemyInfo)
 				enemies.push_back(enemy);
+		};
+	};
+
+	// Computational State Space
+	struct AIstate
+	{
+	};
+
+	// Combine the different parts of the POMDP
+	struct AIinfo 
+	{
+		AIstate state;
+		int actions[2];
+			// 0 = end turn, no addtl param
+			// 1 = move, 2nd param inidcates direction
+			// 2 = attack, 2nd param is id of target
+		AIobservations observations;
+		float reward() {
+			return 0.0;
+		}
+		AIinfo(AIobservations obsv) {
+			observations = obsv;
 		}
 	};
 
+	// Gather AI Info
 	int id = _unit->getId();
 	int turn = _save->getTurn();
 	Position pos = _unit->getPosition();
@@ -3916,16 +3946,25 @@ void AIModule::xcommandAIthink(BattleAction* action)
 		if (unit->getFaction() != _unit->getFaction())
 		{
 			if (visibleToAnyFriend(unit))
-				enemies.push_back(SimpleEnemy(unit));
+				enemies.push_back(SimpleEnemy(unit, validTarget(unit, true, false)));
 		}
 		else
 		{
-			auto save = _save;
-			allies.push_back(SimpleAlly(unit, save));
+			allies.push_back(SimpleAlly(unit));
 		}
 	}
 
-	AIinfo* aiInfo = new AIinfo(id, turn, tiles, allies, enemies);
+	AIinfo aiInfo = AIinfo(AIobservations(id, turn, tiles, allies, enemies));
+	for (int action = -1; action != 0;)
+	{
+		// send AIinfo to SPN or other policy
+
+		// process action response
+
+
+		break;
+	};
+	_unit->setWantToEndTurn(true);
 	return;
 }
 
