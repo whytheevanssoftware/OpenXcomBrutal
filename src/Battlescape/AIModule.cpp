@@ -18,6 +18,8 @@
  */
 #include <climits>
 #include <algorithm>
+#include <iostream>
+#include <fstream>
 #include "AIModule.h"
 #include "../Savegame/BattleItem.h"
 #include "../Savegame/Node.h"
@@ -3828,19 +3830,35 @@ void AIModule::xcommandAIthink(BattleAction* action)
 				}
 			}
 		}
+		std::string toString(){
+			return std::to_string(pos.x) + "," + std::to_string(pos.y) + "," + std::to_string(pos.z) + ","
+				+ std::to_string(discovered) + ","
+				+ std::to_string(traversable)+ ","
+				+ std::to_string(door);
+		};
 	};
 	struct SimpleAlly
 	{
+		int id, timeUnits;
 		Position pos;
-		int timeUnits;
 		struct {
 			int health, armorTotal, energy, reaction, morale, mana;
+			std::string toString()
+			{
+				return std::to_string(health) + ","
+					+ std::to_string(armorTotal) + ","
+					+ std::to_string(energy) + ","
+					+ std::to_string(reaction) + ","
+					+ std::to_string(morale) + ","
+					+ std::to_string(mana);
+			};
 		} stats;
 		bool isMindControlled = false, isStunned = false;
 		int mainWeapon;
 		bool needReload = false;
 		SimpleAlly(BattleUnit* ally)
 		{
+			id = ally->getId();
 			pos = ally->getPosition();
 			timeUnits = ally->getTimeUnits();
 			stats.health = ally->getHealth();
@@ -3854,55 +3872,94 @@ void AIModule::xcommandAIthink(BattleAction* action)
 			isStunned = ally->getStunlevel() > 0;
 			mainWeapon = ally->getMainHandWeapon()->getId();
 			needReload = !ally->getMainHandWeapon()->haveAnyAmmo();
-		}
+		};
+		std::string toString(){
+			return std::to_string(id) + ","
+				+ std::to_string(pos.x) + "," + std::to_string(pos.y) + "," + std::to_string(pos.z) + ","
+				+ std::to_string(timeUnits) + ","
+				+ stats.toString() + ","
+				+ std::to_string(isMindControlled) + ","
+				+ std::to_string(isStunned) + ","
+				+ std::to_string(mainWeapon) + ","
+				+ std::to_string(needReload);
+		};
 	};
 	struct SimpleEnemy
 	{
+		int id = 0;
 		Position pos;
 		std::string type;
-		bool canTarget;
+		bool canTarget = false;
 		SimpleEnemy(BattleUnit *enemy, bool targetable = false)
 		{
+			id = enemy->getId();
 			pos = enemy->getPosition();
 			type = enemy->getType();
 			canTarget = targetable;
-		}
+		};
+		std::string toString()
+		{
+			return std::to_string(id) + ","
+				+ std::to_string(pos.x) + "," + std::to_string(pos.y) + "," + std::to_string(pos.z) + ","
+				+ type + ","
+				+ std::to_string(canTarget);
+		};
 	};
 
 	// AI Observation Space
 	struct AIobservations
 	{
-		int currentUnit = 0;
-		int currentTurn = 0;
-		struct
-		{
-			std::vector<SimpleTile> byTile;
-			int discovered = 0;
-		} tiles;
+		int tilesDiscovered = 0;
+		std::vector<SimpleTile> tiles;
 		std::vector<SimpleAlly> allies;
 		std::vector<SimpleEnemy> enemies;
 		AIobservations(){};
-		AIobservations(int id, int turn, std::vector<SimpleTile> tileInfo, std::vector<SimpleAlly> allyInfo, std::vector<SimpleEnemy> enemyInfo)
+		AIobservations(std::vector<SimpleTile> tileInfo, std::vector<SimpleAlly> allyInfo, std::vector<SimpleEnemy> enemyInfo)
 		{
-			currentUnit = id;
-			currentTurn = turn;
-			tiles.discovered = 0;
+			tilesDiscovered = 0;
 			for (SimpleTile& tile : tileInfo)
 			{
-				tiles.byTile.push_back(tile);
+				tiles.push_back(tile);
 				if (tile.discovered)
-					tiles.discovered++;
+					tilesDiscovered++;
 			}
 			for (SimpleAlly& ally : allyInfo)
 				allies.push_back(ally);
 			for (SimpleEnemy& enemy : enemyInfo)
 				enemies.push_back(enemy);
 		};
+		std::string toString()
+		{
+			std::string str = std::to_string(tilesDiscovered) + ",[";
+			for (auto& tile : tiles)
+				str += "[" + tile.toString() + "],";
+			str.pop_back();
+			str += "],[";
+			for (auto& ally : allies)
+				str += "[" + ally.toString() + "],";
+			str.pop_back();
+			str += "],[";
+			for (auto& enemy : enemies)
+				str += "[" + enemy.toString() + "],";
+			str.pop_back();
+			str += "]";
+			return str;
+		};
 	};
 
 	// Computational State Space
 	struct AIstate
 	{
+		int unit = 0, turn = 0;
+		AIstate(){};
+		AIstate(int currentUnit, int currentTurn)
+		{
+			unit = currentUnit;
+			turn = currentTurn;
+		}
+		std::string toString(){
+			return std::to_string(unit) + "," + std::to_string(turn);
+		};
 	};
 
 	// Combine the different parts of the POMDP
@@ -3914,12 +3971,18 @@ void AIModule::xcommandAIthink(BattleAction* action)
 			// 1 = move, 2nd param inidcates direction
 			// 2 = attack, 2nd param is id of target
 		AIobservations observations;
-		float reward() {
+		float reward()
+		{
 			return 0.0;
-		}
-		AIinfo(AIobservations obsv) {
+		};
+		AIinfo(AIstate currentState, AIobservations obsv)
+		{
+			state = currentState;
 			observations = obsv;
-		}
+		};
+		std::string toString(){
+			return "[" + state.toString() + "],[" + observations.toString() + "]\n";
+		};
 	};
 
 	// Gather AI Info
@@ -3954,16 +4017,30 @@ void AIModule::xcommandAIthink(BattleAction* action)
 		}
 	}
 
-	AIinfo aiInfo = AIinfo(AIobservations(id, turn, tiles, allies, enemies));
+	AIinfo aiInfo = AIinfo(AIstate(id, turn),AIobservations(tiles, allies, enemies));
 	for (int action = -1; action != 0;)
 	{
-		// send AIinfo to SPN or other policy
+
+		// send AIinfo to CSV
+		std::string fpath = Options::getMasterUserFolder() + "XCOMmandAI.info";
+		if (CrossPlatform::fileExists(fpath) && !(turn == 1 && id == 1 ))
+		{
+			std::ostringstream sstr;
+			sstr << CrossPlatform::readFile(fpath).get()->rdbuf();
+			std::string str = sstr.str() + aiInfo.toString();
+			CrossPlatform::writeFile(fpath, str);
+		}
+		else
+		{
+			CrossPlatform::writeFile(fpath, aiInfo.toString());
+		}
 
 		// process action response
 
 
 		break;
 	};
+
 	_unit->setWantToEndTurn(true);
 	return;
 }
