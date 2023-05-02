@@ -3981,13 +3981,9 @@ void AIModule::xcommandAIthink(BattleAction* action)
 		AIobservations(){};
 		AIobservations(std::vector<SimpleTile> tileInfo, std::vector<SimpleAlly> allyInfo, std::vector<SimpleEnemy> enemyInfo)
 		{
-			tilesDiscovered = 0;
+			tilesDiscovered = tileInfo.size();
 			for (SimpleTile& tile : tileInfo)
-			{
 				tiles.push_back(tile);
-				if (tile.discovered)
-					tilesDiscovered++;
-			}
 			for (SimpleAlly& ally : allyInfo)
 				allies.push_back(ally);
 			for (SimpleEnemy& enemy : enemyInfo)
@@ -4103,15 +4099,16 @@ void AIModule::xcommandAIthink(BattleAction* action)
 	struct AIinfo 
 	{
 		AIstate state;
-		int action, actionInfo;
+		int action = -1, actionInfo = -1;
 			// 0 = end turn, no addtl param
 			// 1 = move, 2nd param inidcates direction
 			// 2 = attack, 2nd param is id of target
 		AIobservations observations;
-		float reward(int newTiles, int dmgToEnemy, int dmgToAlly, int killedEnemies, int killedAllies, int tuSpent)
+		float reward = 0;
+		float calcReward(int newTiles, int dmgToEnemy, int dmgToAlly, int killedEnemies, int killedAllies, int tuSpent)
 		{
-			// do this externally
-			return newTiles + dmgToEnemy - dmgToAlly + killedEnemies - killedAllies - tuSpent;
+			reward = newTiles + dmgToEnemy - dmgToAlly + killedEnemies - killedAllies - tuSpent;
+			return reward;
 		};
 		std::vector<AIinfo> history;
 		bool trailingComma = false;
@@ -4159,11 +4156,15 @@ void AIModule::xcommandAIthink(BattleAction* action)
 				info.erase(0, pos + delim.length());
 				pos = 0;
 			};
+			if (info[0] == '[')
+				elems.push_back(info.substr(1, info.length() - 2));
+			else
+				elems.push_back(info);
 			state = AIstate(elems[0]);
 			observations = AIobservations(elems[1]);
 		};
 		std::string toString(){
-			return "[" + state.toString() + "],[" + observations.toString() + "]" + (trailingComma ? "," : "");
+			return "[" + state.toString() + "],[" + std::to_string(action) + "," + std::to_string(actionInfo) + "],[" + observations.toString() + "],[" + std::to_string(reward) + "]" + (trailingComma ? "," : "");
 		};
 		std::string toStringFull()
 		{
@@ -4186,6 +4187,7 @@ void AIModule::xcommandAIthink(BattleAction* action)
 		tiles.push_back(SimpleTile(t));
 	}
 	std::vector<SimpleAlly> allies;
+	allies.push_back(SimpleAlly(_unit));
 	std::vector<SimpleEnemy> enemies;
 	for (BattleUnit* unit : *(_save->getUnits()))
 	{
@@ -4196,7 +4198,7 @@ void AIModule::xcommandAIthink(BattleAction* action)
 			if (visibleToAnyFriend(unit))
 				enemies.push_back(SimpleEnemy(unit, validTarget(unit, true, false)));
 		}
-		else
+		else if (unit->getId() != _unit->getId())
 		{
 			allies.push_back(SimpleAlly(unit));
 		}
@@ -4230,8 +4232,40 @@ void AIModule::xcommandAIthink(BattleAction* action)
 
 		// process action response
 		brutalThink(action);
-
+		
 		// update CSV w/ environmental response
+		tiles.clear();
+		for (int i = 0; i < _save->getMapSizeXYZ(); i++)
+		{
+			Tile* t = _save->getTile(i);
+			if (!t || !t->isDiscovered(O_FLOOR))
+				continue;
+			tiles.push_back(SimpleTile(t));
+		}
+		allies.clear();
+		allies.push_back(SimpleAlly(_unit));
+		enemies.clear();
+		for (BattleUnit* unit : *(_save->getUnits()))
+		{
+			if (unit->getMainHandWeapon() == NULL || unit->isOut())
+				continue;
+			if (unit->getFaction() != _unit->getFaction())
+			{
+				if (visibleToAnyFriend(unit))
+					enemies.push_back(SimpleEnemy(unit, validTarget(unit, true, false)));
+			}
+			else if (unit->getId() != _unit->getId())
+			{
+				allies.push_back(SimpleAlly(unit));
+			}
+		}
+		aiInfo.calcReward(
+			tiles.size() - aiInfo.observations.tilesDiscovered,
+			0,
+			_unit->getHealth() - aiInfo.observations.allies[0].stats.health,
+			allies.size() - aiInfo.observations.allies.size(),
+			enemies.size() - aiInfo.observations.enemies.size(),
+			aiInfo.observations.allies[0].timeUnits - _unit->getTimeUnits());
 		CrossPlatform::writeFile(fpath, data + aiInfo.toString() + "\n");
 
 		break;
