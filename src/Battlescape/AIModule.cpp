@@ -3811,320 +3811,9 @@ void AIModule::xcommandAIthink(BattleAction* action)
 	if (_unit->getWantToEndTurn())
 		return;
 
-	struct SimpleTile
+	struct Parser
 	{
-		Position pos;
-		bool discovered, traversable = true, door = false;
-		bool trailingComma = false;
-		SimpleTile(Tile* tile)
-		{
-			pos = tile->getPosition();
-			discovered = tile->isDiscovered(O_FLOOR);
-			traversable = !tile->isBigWall() && !tile->getObstacle(O_FLOOR) && !tile->getDangerous();
-			door = false;
-			for (int i = 0; i < O_MAX; i++)
-			{
-				if (tile->isDoor((TilePart)i))
-				{
-					door = true;
-					break;
-				}
-			}
-		}
-		SimpleTile(std::string info)
-		{
-			std::string delim = ",";
-			std::vector<std::string> elems;
-			for (size_t pos; (pos = info.find(delim)) != std::string::npos;)
-			{
-				elems.push_back(info.substr(0, pos));
-				info.erase(0, pos + delim.length());
-			};
-			pos.x = stoi(elems[0]);
-			pos.y = stoi(elems[1]);
-			pos.z = stoi(elems[2]);
-			discovered = stoi(elems[3]);
-			traversable = stoi(elems[4]);
-			door = stoi(elems[5]);
-		}
-		std::string toString(){
-			return std::to_string(pos.x) + "," + std::to_string(pos.y) + "," + std::to_string(pos.z) + ","
-				+ std::to_string(discovered) + ","
-				+ std::to_string(traversable) + ","
-				+ std::to_string(door) + (trailingComma ? "," : "");
-		};
-	};
-	struct SimpleAlly
-	{
-		int id, timeUnits;
-		Position pos;
-		struct {
-			int health, armorTotal, energy, reaction, morale, mana, shooting, melee;
-			std::string toString()
-			{
-				return std::to_string(health) + ","
-					+ std::to_string(armorTotal) + ","
-					+ std::to_string(energy) + ","
-					+ std::to_string(reaction) + ","
-					+ std::to_string(morale) + ","
-					+ std::to_string(mana) + ","
-					+ std::to_string(shooting) + ","
-					+ std::to_string(melee);
-			};
-		} stats;
-		bool isMindControlled = false, isStunned = false;
-		int mainWeapon;
-		bool needReload = false;
-		bool trailingComma = false;
-		SimpleAlly(BattleUnit* ally)
-		{
-			id = ally->getId();
-			pos = ally->getPosition();
-			timeUnits = ally->getTimeUnits();
-			stats.health = ally->getHealth();
-			for (size_t i = 0; i < SIDE_MAX; i++)
-				stats.armorTotal += ally->getArmor()->getArmor((UnitSide)i);
-			stats.energy = ally->getEnergy();
-			stats.reaction = ally->getReactionScore();
-			stats.morale = ally->getMorale();
-			stats.mana = ally->getMana();
-			stats.shooting = ally->getBaseStats()->firing;
-			stats.melee = ally->getBaseStats()->melee;
-			isMindControlled = ally->getFaction() != ally->getOriginalFaction();
-			isStunned = ally->getStunlevel() > 0;
-			mainWeapon = ally->getMainHandWeapon()->getId();
-			needReload = !ally->getMainHandWeapon()->haveAnyAmmo();
-		};
-		SimpleAlly(std::string info)
-		{
-			std::string delim = ",";
-			std::vector<std::string> elems;
-			for (size_t pos; (pos = info.find(delim)) != std::string::npos;)
-			{
-				elems.push_back(info.substr(0, pos));
-				info.erase(0, pos + delim.length());
-			};
-			id = stoi(elems[0]);
-			pos.x = stoi(elems[1]);
-			pos.y = stoi(elems[2]);
-			pos.z = stoi(elems[3]);
-			timeUnits = stoi(elems[4]);
-			stats.health = stoi(elems[5]);
-			stats.armorTotal = stoi(elems[6]);
-			stats.energy = stoi(elems[7]);
-			stats.reaction = stoi(elems[8]);
-			stats.morale = stoi(elems[9]);
-			stats.mana = stoi(elems[10]);
-			isMindControlled = stoi(elems[11]);
-			isStunned = stoi(elems[12]);
-			mainWeapon = stoi(elems[13]);
-			needReload = stoi(elems[14]);
-		};
-		std::string toString(){
-			return std::to_string(id) + ","
-				+ std::to_string(pos.x) + "," + std::to_string(pos.y) + "," + std::to_string(pos.z) + ","
-				+ std::to_string(timeUnits) + ","
-				+ stats.toString() + ","
-				+ std::to_string(isMindControlled) + ","
-				+ std::to_string(isStunned) + ","
-				+ std::to_string(mainWeapon) + ","
-				+ std::to_string(needReload) + (trailingComma ? "," : "");
-		};
-	};
-	struct SimpleEnemy
-	{
-		int id = 0;
-		Position pos;
-		std::string type;
-		bool canTarget = false;
-		bool trailingComma = false;
-		SimpleEnemy(BattleUnit *enemy, bool targetable = false)
-		{
-			id = enemy->getId();
-			pos = enemy->getPosition();
-			type = enemy->getType();
-			canTarget = targetable;
-		};
-		SimpleEnemy(std::string info)
-		{
-			std::string delim = ",";
-			std::vector<std::string> elems;
-			for (size_t pos; (pos = info.find(delim)) != std::string::npos;)
-			{
-				elems.push_back(info.substr(0, pos));
-				info.erase(0, pos + delim.length());
-			};
-			id = stoi(elems[0]);
-			pos.x = stoi(elems[1]);
-			pos.y = stoi(elems[2]);
-			pos.z = stoi(elems[3]);
-			type = elems[4];
-			canTarget = stoi(elems[5]);
-		};
-		std::string toString()
-		{
-			return std::to_string(id) + ","
-				+ std::to_string(pos.x) + "," + std::to_string(pos.y) + "," + std::to_string(pos.z) + ","
-				+ type + ","
-				+ std::to_string(canTarget) + (trailingComma ? "," : "");
-		};
-	};
-
-	// AI Observation Space
-	struct AIobservations
-	{
-		int tilesDiscovered = 0;
-		std::vector<SimpleTile> tiles;
-		std::vector<SimpleAlly> allies;
-		std::vector<SimpleEnemy> enemies;
-		bool trailingComma = false;
-		AIobservations(){};
-		AIobservations(std::vector<SimpleTile> tileInfo, std::vector<SimpleAlly> allyInfo, std::vector<SimpleEnemy> enemyInfo)
-		{
-			tilesDiscovered = tileInfo.size();
-			for (SimpleTile& tile : tileInfo)
-				tiles.push_back(tile);
-			for (SimpleAlly& ally : allyInfo)
-				allies.push_back(ally);
-			for (SimpleEnemy& enemy : enemyInfo)
-				enemies.push_back(enemy);
-		};
-		AIobservations(std::string info)
-		{
-			std::string delim = ",";
-			std::vector<std::string> elems;
-			for (size_t pos = 0; (pos = info.find(delim, pos)) != std::string::npos;)
-			{
-				int posOk = 0;
-				bool sub = false;
-				for (int i = 0; i < pos; i++)
-				{
-					switch (info[i])
-					{
-					case '[':
-						posOk++;
-						sub = true;
-						break;
-					case ']':
-						posOk--;
-					}
-				};
-				if (posOk != 0)
-				{
-					pos += delim.length();
-					continue;
-				}
-				if (sub)
-					elems.push_back(info.substr(1, pos - 2));
-				else
-					elems.push_back(info.substr(0, pos));
-				info.erase(0, pos + delim.length());
-				pos = 0;
-			};
-			tilesDiscovered = stoi(elems[0]);
-			delim = "]";
-			for (size_t pos; (pos = elems[1].find(delim)) != std::string::npos;)
-			{
-				tiles.push_back(SimpleTile(elems[1].substr(1, pos)));
-				elems[1].erase(0, pos + std::string(delim + ",").length());
-			};
-			for (size_t pos; (pos = elems[2].find(delim)) != std::string::npos;)
-			{
-				allies.push_back(SimpleAlly(elems[2].substr(1, pos)));
-				elems[2].erase(0, pos + std::string(delim + ",").length());
-			};
-			for (size_t pos; (pos = elems[3].find(delim)) != std::string::npos;)
-			{
-				enemies.push_back(SimpleEnemy(elems[3].substr(1, pos)));
-				elems[3].erase(0, pos + std::string(delim + ",").length());
-			};
-		}
-		std::string toString()
-		{
-			std::string str = std::to_string(tilesDiscovered) + ",[";
-			for (auto& tile : tiles)
-				str += "[" + tile.toString() + "],";
-			if (tiles.size() > 0 && !trailingComma)
-				str.pop_back();
-			str += "],[";
-			for (auto& ally : allies)
-				str += "[" + ally.toString() + "],";
-			if (allies.size() > 0 && !trailingComma)
-				str.pop_back();
-			str += "],[";
-			for (auto& enemy : enemies)
-				str += "[" + enemy.toString() + "],";
-			if (enemies.size() > 0 && !trailingComma)
-				str.pop_back();
-			str += "]";
-			return str + (trailingComma ? "," : "");
-		};
-	};
-
-	// Computational State Space
-	struct AIstate
-	{
-		int unit = 0, turn = 0, netDmg = 0, rscVal = 0;
-		bool trailingComma = false;
-		AIstate(){};
-		AIstate(int currentUnit, int currentTurn, int resources)
-		{
-			unit = currentUnit;
-			turn = currentTurn;
-			rscVal = resources;
-		}
-		AIstate(std::string info)
-		{
-			std::string delim = ",";
-			std::vector<std::string> elems;
-			for (size_t pos = 0; (pos = info.find(delim)) != std::string::npos;)
-			{
-				elems.push_back(info.substr(0, pos));
-				info.erase(0, pos + delim.length());
-			};
-			unit = std::stoi(elems[0]);
-			turn = std::stoi(elems[1]);
-			netDmg = std::stoi(elems[2]);
-			rscVal = std::stoi(elems[3]);
-		}
-		std::string toString(){
-			return std::to_string(unit) + ","
-				+ std::to_string(turn) + ","
-				+ std::to_string(netDmg) + ","
-				+ std::to_string(rscVal) + (trailingComma ? "," : "");
-		};
-	};
-
-	// Combine the different parts of the POMDP
-	struct AIinfo 
-	{
-		AIstate state;
-		int action = -1, actionInfo = -1;
-			// 0 = end turn, no addtl param
-			// 1 = move, 2nd param inidcates direction
-			// 2 = attack, 2nd param is id of target
-		AIobservations observations;
-		float reward = 0;
-		float calcReward(int newTiles, int dmgToEnemy, int dmgToAlly, int killedEnemies, int killedAllies, int tuSpent)
-		{
-			reward = newTiles + dmgToEnemy - dmgToAlly + killedEnemies - killedAllies - tuSpent;
-			return reward;
-		};
-		std::vector<AIinfo> history;
-		bool trailingComma = false;
-		AIinfo(AIstate currentState, AIobservations obsv, std::string hist = "")
-		{
-			state = currentState;
-			observations = obsv;
-
-			std::string delim = "\n";
-			for (size_t pos = 0; (pos = hist.find(delim)) != std::string::npos;)
-			{
-				history.push_back(AIinfo(hist.substr(0, pos)));
-				hist.erase(0, pos + delim.length());
-			};
-		};
-		AIinfo(std::string info)
+		static std::vector<std::string> parse(std::string info)
 		{
 			std::string delim = ",";
 			std::vector<std::string> elems;
@@ -4160,11 +3849,273 @@ void AIModule::xcommandAIthink(BattleAction* action)
 				elems.push_back(info.substr(1, info.length() - 2));
 			else
 				elems.push_back(info);
-			state = AIstate(elems[0]);
-			observations = AIobservations(elems[1]);
+			return elems;
+		};
+	};
+
+	// AI Observation Space
+	struct SimpleTile
+	{
+		Position pos;
+		bool discovered, traversable = true, door = false;
+
+		SimpleTile(Tile* tile)
+		{
+			pos = tile->getPosition();
+			discovered = tile->isDiscovered(O_FLOOR);
+			traversable = !tile->isBigWall() && !tile->getObstacle(O_FLOOR) && !tile->getDangerous();
+			door = false;
+			for (int i = 0; i < O_MAX; i++)
+			{
+				if (tile->isDoor((TilePart)i))
+				{
+					door = true;
+					break;
+				}
+			}
+		}
+		SimpleTile(std::string info)
+		{
+			std::vector<std::string> elems = Parser::parse(info);
+			pos.x = std::stoi(elems[0]);
+			pos.y = std::stoi(elems[1]);
+			pos.z = stoi(elems[2]);
+			discovered = stoi(elems[3]);
+			traversable = stoi(elems[4]);
+			door = stoi(elems[5]);
+		}
+		std::string toString()
+		{
+			return std::to_string(pos.x) + "," + std::to_string(pos.y) + "," + std::to_string(pos.z) + "," + std::to_string(discovered) + "," + std::to_string(traversable) + "," + std::to_string(door);
+		};
+	};
+	struct SimpleAlly
+	{
+		int id, timeUnits;
+		Position pos;
+		struct
+		{
+			int health, armorTotal, energy, reaction, morale, mana, shooting, melee;
+			std::string toString()
+			{
+				return std::to_string(health) + "," + std::to_string(armorTotal) + "," + std::to_string(energy) + "," + std::to_string(reaction) + "," + std::to_string(morale) + "," + std::to_string(mana) + "," + std::to_string(shooting) + "," + std::to_string(melee);
+			};
+		} stats;
+		bool isMindControlled = false, isStunned = false, isAlive = true;
+		int mainWeapon;
+		bool needReload = false;
+
+		SimpleAlly(BattleUnit* ally)
+		{
+			id = ally->getId();
+			pos = ally->getPosition();
+			timeUnits = ally->getTimeUnits();
+			stats.health = ally->getHealth();
+			for (size_t i = 0; i < SIDE_MAX; i++)
+				stats.armorTotal += ally->getArmor()->getArmor((UnitSide)i);
+			stats.energy = ally->getEnergy();
+			stats.reaction = ally->getReactionScore();
+			stats.morale = ally->getMorale();
+			stats.mana = ally->getMana();
+			stats.shooting = ally->getBaseStats()->firing;
+			stats.melee = ally->getBaseStats()->melee;
+			isMindControlled = ally->getFaction() != ally->getOriginalFaction();
+			isStunned = ally->getStunlevel() > 0;
+			isAlive = !ally->isOut();
+			if (auto weapon = ally->getMainHandWeapon())
+			{
+				mainWeapon = weapon->getId();
+				needReload = !weapon->haveAnyAmmo();
+			}
+		};
+		SimpleAlly(std::string info)
+		{
+			std::vector<std::string> elems = Parser::parse(info);
+			id = stoi(elems[0]);
+			isAlive = stoi(elems[1]);
+			pos.x = stoi(elems[2]);
+			pos.y = stoi(elems[3]);
+			pos.z = stoi(elems[4]);
+			timeUnits = stoi(elems[5]);
+			stats.health = stoi(elems[6]);
+			stats.armorTotal = stoi(elems[7]);
+			stats.energy = stoi(elems[8]);
+			stats.reaction = stoi(elems[9]);
+			stats.morale = stoi(elems[10]);
+			stats.mana = stoi(elems[11]);
+			isMindControlled = stoi(elems[12]);
+			isStunned = stoi(elems[13]);
+			mainWeapon = stoi(elems[14]);
+			needReload = stoi(elems[15]);
+		};
+		std::string toString()
+		{
+			return std::to_string(id) + "," + std::to_string(isAlive) + "," + std::to_string(pos.x) + "," + std::to_string(pos.y) + "," + std::to_string(pos.z) + "," + std::to_string(timeUnits) + "," + stats.toString() + "," + std::to_string(isMindControlled) + "," + std::to_string(isStunned) + "," + std::to_string(mainWeapon) + "," + std::to_string(needReload);
+		};
+	};
+	struct SimpleEnemy
+	{
+		int id = 0;
+		Position pos;
+		std::string type;
+		bool canTarget = false, isAlive = true;
+		SimpleEnemy(BattleUnit* enemy, bool targetable = false)
+		{
+			id = enemy->getId();
+			pos = enemy->getPosition();
+			type = enemy->getType();
+			canTarget = targetable;
+			isAlive = !enemy->isOut();
+		};
+		SimpleEnemy(std::string info)
+		{
+			std::vector<std::string> elems = Parser::parse(info);
+			id = stoi(elems[0]);
+			isAlive = stoi(elems[1]);
+			pos.x = stoi(elems[2]);
+			pos.y = stoi(elems[3]);
+			pos.z = stoi(elems[4]);
+			type = elems[5];
+			canTarget = stoi(elems[6]);
+		};
+		std::string toString()
+		{
+			return std::to_string(id) + "," + std::to_string(isAlive) + "," + std::to_string(pos.x) + "," + std::to_string(pos.y) + "," + std::to_string(pos.z) + "," + type + "," + std::to_string(canTarget);
+		};
+	};
+	struct AIobservations
+	{
+		int tilesDiscovered = 0;
+		std::vector<SimpleTile> tiles;
+		std::vector<SimpleAlly> allies;
+		std::vector<SimpleEnemy> enemies;
+		
+		AIobservations(){};
+		AIobservations(std::vector<SimpleTile> tileInfo, std::vector<SimpleAlly> allyInfo, std::vector<SimpleEnemy> enemyInfo)
+		{
+			tilesDiscovered = tileInfo.size();
+			for (SimpleTile& tile : tileInfo)
+				tiles.push_back(tile);
+			for (SimpleAlly& ally : allyInfo)
+				allies.push_back(ally);
+			for (SimpleEnemy& enemy : enemyInfo)
+				enemies.push_back(enemy);
+		};
+		AIobservations(std::string info)
+		{
+			std::vector<std::string> elems = Parser::parse(info);
+			tilesDiscovered = stoi(elems[0]);
+			std::string delim = "]";
+			for (size_t pos; (pos = elems[1].find(delim)) != std::string::npos;)
+			{
+				tiles.push_back(SimpleTile(elems[1].substr(1, pos)));
+				elems[1].erase(0, pos + std::string(delim + ",").length());
+			};
+			for (size_t pos; (pos = elems[2].find(delim)) != std::string::npos;)
+			{
+				allies.push_back(SimpleAlly(elems[2].substr(1, pos)));
+				elems[2].erase(0, pos + std::string(delim + ",").length());
+			};
+			for (size_t pos; (pos = elems[3].find(delim)) != std::string::npos;)
+			{
+				enemies.push_back(SimpleEnemy(elems[3].substr(1, pos)));
+				elems[3].erase(0, pos + std::string(delim + ",").length());
+			};
+		};
+		std::string toString()
+		{
+			std::string str = std::to_string(tilesDiscovered) + ",[";
+			for (auto& tile : tiles)
+				str += "[" + tile.toString() + "],";
+			if (tiles.size() > 0)
+				str.pop_back();
+			str += "],[";
+			for (auto& ally : allies)
+				str += "[" + ally.toString() + "],";
+			if (allies.size() > 0)
+				str.pop_back();
+			str += "],[";
+			for (auto& enemy : enemies)
+				str += "[" + enemy.toString() + "],";
+			if (enemies.size() > 0)
+				str.pop_back();
+			str += "]";
+			return str;
+		};
+	};
+
+	// Computational State Space
+	struct AIstate
+	{
+		int unit = 0, turn = 0, netDmg = 0, rscVal = 0;
+		
+		AIstate(){};
+		AIstate(int currentUnit, int currentTurn, int resources)
+		{
+			unit = currentUnit;
+			turn = currentTurn;
+			rscVal = resources;
+		}
+		AIstate(std::string info)
+		{
+			auto elems = Parser::parse(info);
+			unit = std::stoi(elems[0]);
+			turn = std::stoi(elems[1]);
+			netDmg = std::stoi(elems[2]);
+			rscVal = std::stoi(elems[3]);
 		};
 		std::string toString(){
-			return "[" + state.toString() + "],[" + std::to_string(action) + "," + std::to_string(actionInfo) + "],[" + observations.toString() + "],[" + std::to_string(reward) + "]" + (trailingComma ? "," : "");
+			return std::to_string(unit) + ","
+				+ std::to_string(turn) + ","
+				+ std::to_string(netDmg) + ","
+				+ std::to_string(rscVal);
+		};
+	};
+
+	// Combine the different parts of the POMDP
+	struct AIinfo
+	{
+		AIstate state;
+		int action = -1, actionInfo = -1;
+		// 0 = end turn, no addtl param
+		// 1 = move, 2nd param inidcates direction
+		// 2 = attack, 2nd param is id of target
+		AIobservations observations;
+		float reward = 0;
+		float calcReward(int newTiles, int dmgToEnemy, int dmgToAlly, int killedEnemies, int killedAllies, int tuSpent)
+		{
+			reward = newTiles + dmgToEnemy - dmgToAlly + killedEnemies - killedAllies - tuSpent;
+			return reward;
+		};
+		std::vector<AIinfo> history;
+		
+		AIinfo(AIstate currentState, AIobservations obsv, std::string hist = "")
+		{
+			state = currentState;
+			observations = obsv;
+
+			std::string delim = "\n";
+			for (size_t pos = 0; (pos = hist.find(delim)) != std::string::npos;)
+			{
+				history.push_back(AIinfo(hist.substr(0, pos)));
+				hist.erase(0, pos + delim.length());
+			};
+		};
+		AIinfo(std::string info)
+		{
+			std::vector<std::string> elems = Parser::parse(info);
+			state = AIstate(elems[0]);
+			action = stoi(Parser::parse(elems[1])[0]);
+			actionInfo = stoi(Parser::parse(elems[1])[1]);
+			observations = AIobservations(elems[2]);
+			reward = stof(elems[3]);
+		};
+		std::string toString()
+		{
+			return "[" + state.toString() + "],["
+				+ std::to_string(action) + "," + std::to_string(actionInfo) + "],["
+				+ observations.toString() + "],["
+				+ std::to_string(reward) + "]";
 		};
 		std::string toStringFull()
 		{
@@ -4177,7 +4128,7 @@ void AIModule::xcommandAIthink(BattleAction* action)
 	};
 
 	// Gather AI Info
-	int id = _unit->getId(), turn = _save->getTurn(), resources = _unit->getCarriedWeight();
+	int id = _unit->getId(), turn = _save->getTurn(), resources = _unit->getCarriedWeight(), dmg = 0;
 	std::vector<SimpleTile> tiles;
 	for (int i = 0; i < _save->getMapSizeXYZ(); i++)
 	{
@@ -4191,17 +4142,16 @@ void AIModule::xcommandAIthink(BattleAction* action)
 	std::vector<SimpleEnemy> enemies;
 	for (BattleUnit* unit : *(_save->getUnits()))
 	{
-		if (unit->getMainHandWeapon() == NULL || unit->isOut())
-			continue;
 		if (unit->getFaction() != _unit->getFaction())
 		{
-			if (visibleToAnyFriend(unit))
+			if (!unit->getMainHandWeapon() == NULL && visibleToAnyFriend(unit))
+			{
 				enemies.push_back(SimpleEnemy(unit, validTarget(unit, true, false)));
+				dmg += unit->getHealth();
+			}
 		}
 		else if (unit->getId() != _unit->getId())
-		{
 			allies.push_back(SimpleAlly(unit));
-		}
 	}
 	std::string history = "";
 	if (id > 1 || turn > 1)
@@ -4252,13 +4202,17 @@ void AIModule::xcommandAIthink(BattleAction* action)
 			if (unit->getFaction() != _unit->getFaction())
 			{
 				if (visibleToAnyFriend(unit))
+				{
 					enemies.push_back(SimpleEnemy(unit, validTarget(unit, true, false)));
+					dmg -= unit->getHealth();
+				}
 			}
 			else if (unit->getId() != _unit->getId())
 			{
 				allies.push_back(SimpleAlly(unit));
 			}
 		}
+		aiInfo.state.netDmg = dmg - _unit->getHealth() + aiInfo.observations.allies[0].stats.health;
 		aiInfo.calcReward(
 			tiles.size() - aiInfo.observations.tilesDiscovered,
 			0,
