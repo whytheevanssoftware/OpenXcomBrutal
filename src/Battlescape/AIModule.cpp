@@ -4116,7 +4116,6 @@ void AIModule::xcommandAIthink(BattleAction* action)
 
 			// parse history
 			std::string delim = "\n";
-
 			if (keepHist)
 			{
 				for (size_t pos = 0; (pos = hist.find(delim)) != std::string::npos;)

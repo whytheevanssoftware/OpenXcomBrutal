@@ -799,6 +799,27 @@ void DebriefingState::init()
 	{
 		_game->getMod()->playMusic(Mod::DEBRIEF_MUSIC_BAD);
 	}
+	std::string fpath = Options::getMasterUserFolder() + "XCOMmandAI";
+	if (CrossPlatform::fileExists(fpath + ".tmp"))
+	{
+		CrossPlatform::deleteFile(fpath + ".tmp");
+	};
+	if (CrossPlatform::fileExists(fpath + ".info"))
+	{
+		for (int i = 10; i < 100; i++)
+		{
+			if (!CrossPlatform::fileExists(fpath + '-' + std::to_string(i) + ".info"))
+			{
+				std::ostringstream sstr;
+				CrossPlatform::moveFile(fpath + ".info", fpath + '-' + std::to_string(i) + ".info");
+				sstr << CrossPlatform::readFile(fpath + "-XX.info").get()->rdbuf();
+				std::string str = sstr.str();
+				str += std::to_string(_txtTitle->getText() == tr("STR_UFO_IS_RECOVERED").c_str()) + "," + _lstTotal->getCellText(0, 1) + "\n";
+				CrossPlatform::writeFile(fpath + "-XX.info", str);
+				break;
+			};
+		}
+	};
 }
 
 /**
