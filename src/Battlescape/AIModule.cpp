@@ -4230,11 +4230,15 @@ void AIModule::xcommandAIthink(BattleAction* action)
 		std::ostringstream sstr;
 		sstr << CrossPlatform::readFile(fpathTmp).get()->rdbuf();
 		history = sstr.str();
+		if (history[0] != '[')
+		{
+			CrossPlatform::deleteFile(fpathTmp);
+			history.clear();
+		}
 	};
 
-	// collect reference action from brutal
-
-	while (CrossPlatform::fileExists(fpathTmp))
+	// collect reference action for brutal
+	for (;CrossPlatform::fileExists(fpathTmp);)
 	{
 		std::ostringstream sstr;
 		sstr << CrossPlatform::readFile(fpathTmp).get()->rdbuf();
