@@ -3884,7 +3884,7 @@ void AIModule::xcommandAIthink(BattleAction* action)
 			enemyHP -= other.enemyHP;
 			allyCt -= other.allyCt;
 			enemyCt -= other.enemyCt;
-			timeUnits = 0;
+			timeUnits -= other.timeUnits;
 			return *this;
 		}
 		std::string toString()
@@ -4141,10 +4141,10 @@ void AIModule::xcommandAIthink(BattleAction* action)
 			else
 				net -= state;
 			// Log(LOG_INFO) << "net state: " << net.toString() << std::endl;
-			reward = tileWt * net.tilesFnd
-				+ dmgWt * (net.allyHP - net.enemyHP)
-				+ killWt * (net.allyCt - net.enemyCt)
-				- tuWt * net.timeUnits;
+			reward = tileWt * net.tilesFnd // monotonic incr over all
+				+ dmgWt * (net.allyHP - net.enemyHP) // monotonic decr overall?
+				+ killWt * (net.allyCt - net.enemyCt) // monotonic decr overall
+				+ tuWt * net.timeUnits; // monotonic decr per round
 		};
 		AIinfo(std::string info)
 		{
@@ -4176,7 +4176,7 @@ void AIModule::xcommandAIthink(BattleAction* action)
 	AIobsv obsv;
 
 	// Gather AI Info
-	int id = _unit->getId(), turn = _save->getTurn(), resources = _unit->getCarriedWeight(), aHP = 0, eHP = 0, aCT = 0, eCT = 0;
+	int id = _unit->getId(), turn = _save->getTurn(), resources = _unit->getCarriedWeight(), aHP = 0, eHP = 0, aCT = 0, eCT = 0, allyTU = 0;
 	// tile info
 	std::vector<SimpleTile> tiles;
 	for (int i = 0; i < _save->getMapSizeXYZ(); i++)
@@ -4210,6 +4210,7 @@ void AIModule::xcommandAIthink(BattleAction* action)
 			if (!unit->isOut())
 			{
 				aHP += unit->getHealth();
+				allyTU += unit->getTimeUnits();
 				aCT++;
 			}
 		}
@@ -4236,7 +4237,7 @@ void AIModule::xcommandAIthink(BattleAction* action)
 
 	// send AIinfo to CSV
 	AIinfo aiInfo = AIinfo(
-		AIstate(tiles.size(), aHP, eHP, aCT, eCT, _unit->getTimeUnits()),
+		AIstate(tiles.size(), aHP, eHP, aCT, eCT, allyTU),
 		action->type,
 		AIobsv(turn, tiles, allies, enemies),
 		history);
