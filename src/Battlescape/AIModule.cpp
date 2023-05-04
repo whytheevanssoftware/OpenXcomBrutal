@@ -4233,6 +4233,18 @@ void AIModule::xcommandAIthink(BattleAction* action)
 	};
 
 	// collect reference action from brutal
+
+	while (CrossPlatform::fileExists(fpathTmp))
+	{
+		std::ostringstream sstr;
+		sstr << CrossPlatform::readFile(fpathTmp).get()->rdbuf();
+		std::string a = sstr.str();
+		if (a[0] != '[')
+		{
+			action->type = (BattleActionType)stoi(a);
+			break;
+		}
+	}
 	brutalThink(action);
 
 	// send AIinfo to CSV
